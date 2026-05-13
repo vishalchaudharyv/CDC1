@@ -1,0 +1,25 @@
+{
+	"name": "AzureSqlTable1",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureSqlDatabase1",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "PipelineName",
+				"type": "varchar"
+			},
+			{
+				"name": "LastLoadDate",
+				"type": "date"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "WatermarkTable"
+		}
+	}
+}

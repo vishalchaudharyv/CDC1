@@ -1,0 +1,40 @@
+{
+	"name": "AzureSqlTable2",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureSqlDatabase1",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "TxnID",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "TxnDT",
+				"type": "date"
+			},
+			{
+				"name": "TxnAmount",
+				"type": "decimal",
+				"precision": 10,
+				"scale": 2
+			},
+			{
+				"name": "ProductCD",
+				"type": "varchar"
+			},
+			{
+				"name": "ProductQty",
+				"type": "varchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "SourceTransactions"
+		}
+	}
+}
