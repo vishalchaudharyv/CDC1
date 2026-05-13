@@ -1,38 +1,37 @@
-# CDC Incremental Load using Azure Data Factory (ADF)
+# CDC Incremental Load Pipeline using Azure Data Factory (ADF)
 
 ## Project Overview
+This project implements **CDC (Change Data Capture) / Incremental Data Load** using **Azure Data Factory (ADF)**.
 
-This project implements **Change Data Capture (CDC)** / **Incremental Data Load** using **Azure Data Factory (ADF)**.
-
-The objective is to load **only new records** from a source SQL table into daily CSV files, avoiding duplicate data loads.
-
-This is achieved using a **Watermark Table** that stores the **last successful load date**.
+Goal:
+- Read transaction data from **SQL Server**
+- Load **only new records** into a CSV file
+- Avoid duplicate loading
+- Track last successful load using a **Watermark Table**
 
 ---
 
 # Architecture
 
 ```text
-Source SQL Table
-      |
-      v
-Lookup Watermark Table (LastLoadDate)
-      |
-      v
+SQL Server (SourceTransactions)
+        |
+        v
+Lookup Activity (Read LastLoadDate from WatermarkTable)
+        |
+        v
 Copy Activity (Load only new records)
-      |
-      v
-Target CSV File (Daily Output)
-      |
-      v
-Update Watermark Table
+        |
+        v
+CSV File (Target Storage)
+        |
+        v
+Script Activity (Update WatermarkTable)
 ```
 
 ---
 
-# Source Table
-
-## Create Source Table
+# Step 1: Create Source Table
 
 ```sql
 CREATE TABLE SourceTransactions (
@@ -44,7 +43,7 @@ CREATE TABLE SourceTransactions (
 );
 ```
 
-## Insert Sample Data
+## Sample Data
 
 ```sql
 INSERT INTO SourceTransactions VALUES
@@ -56,11 +55,9 @@ INSERT INTO SourceTransactions VALUES
 
 ---
 
-# Watermark Table
+# Step 2: Create Watermark Table
 
-The watermark table stores the **last successful load date**.
-
-## Create Watermark Table
+Watermark table stores the **last successful load date**.
 
 ```sql
 CREATE TABLE WatermarkTable (
@@ -69,7 +66,7 @@ CREATE TABLE WatermarkTable (
 );
 ```
 
-## Insert Initial Watermark
+## Insert Initial Value
 
 ```sql
 INSERT INTO WatermarkTable
@@ -78,30 +75,12 @@ VALUES ('CDC_Pipeline','2025-07-21');
 
 ---
 
-# Azure Data Factory Pipeline Steps
+# Step 3: Azure Data Factory Pipeline
 
-## Step 1: Create Linked Services
+## Activity 1: Lookup Activity
 
-Create linked services for:
-
-- Azure SQL Database (Source)
-- Azure Blob Storage / ADLS (Target)
-
----
-
-## Step 2: Create Datasets
-
-Create datasets for:
-
-- Source SQL Table (`SourceTransactions`)
-- Watermark Table (`WatermarkTable`)
-- Sink CSV File
-
----
-
-## Step 3: Lookup Activity
-
-Fetch the last loaded date from the watermark table.
+Purpose:
+- Read `LastLoadDate` from `WatermarkTable`
 
 ### Query
 
@@ -113,29 +92,33 @@ WHERE PipelineName='CDC_Pipeline';
 
 ---
 
-## Step 4: Copy Activity (Incremental Load)
+## Activity 2: Copy Data Activity
 
-Use dynamic SQL to load only new records.
+Purpose:
+- Load only new records from source table
 
-### Query
+### Dynamic Query
 
 ```sql
 SELECT *
 FROM SourceTransactions
-WHERE TxnDT > '@{activity('LookupWatermark').output.firstRow.LastLoadDate}'
+WHERE TxnDT > '@{activity('Lookup_Watermark').output.firstRow.LastLoadDate}'
 ```
 
 ---
 
-## Step 5: Dynamic File Naming
+## Sink Configuration
 
-Generate daily output files dynamically.
+Target:
+- CSV File (DelimitedText)
+
+Dynamic file name:
 
 ```text
 TxnFile_@{formatDateTime(utcNow(),'ddMMMyyyy')}.csv
 ```
 
-### Example Output
+Example output:
 
 ```text
 TxnFile_22Jul2025.csv
@@ -143,9 +126,12 @@ TxnFile_22Jul2025.csv
 
 ---
 
-## Step 6: Update Watermark
+## Activity 3: Script Activity
 
-After successful load, update the watermark table.
+Purpose:
+- Update watermark after successful load
+
+### SQL Script
 
 ```sql
 UPDATE WatermarkTable
@@ -155,9 +141,23 @@ WHERE PipelineName='CDC_Pipeline';
 
 ---
 
-# Example Flow
+# Final Pipeline Flow
 
-### Day 1 Data
+```text
+Lookup_Watermark
+       ↓
+Copy_New_Records
+       ↓
+Script_Update_Watermark
+```
+
+---
+
+# Example Incremental Load
+
+## Day 1
+
+Source:
 
 | TxnID | TxnDT | Amount |
 |-------|-------|--------|
@@ -172,7 +172,9 @@ TxnFile_21Jul2025.csv
 
 ---
 
-### Day 2 Data
+## Day 2
+
+New Source Records:
 
 | TxnID | TxnDT | Amount |
 |-------|-------|--------|
@@ -189,22 +191,22 @@ Only new records are loaded.
 
 ---
 
-# Benefits
-
-- Incremental data loading
-- Avoids duplicate records
-- Improves pipeline performance
-- Easy to maintain
-- Production-ready CDC pattern
-
----
-
 # Technologies Used
 
 - Azure Data Factory (ADF)
-- Azure SQL Database
+- SQL Server
 - Azure Blob Storage / ADLS
 - SQL
+
+---
+
+# Benefits
+
+- Incremental data loading
+- No duplicate records
+- Better performance
+- Easy maintenance
+- Production-ready CDC pattern
 
 ---
 
@@ -212,16 +214,7 @@ Only new records are loaded.
 
 Implemented a CDC (Change Data Capture) incremental load pipeline using Azure Data Factory.
 
-Used a watermark table to track the last successful load date. ADF Lookup activity retrieves the watermark, and Copy Activity loads only records where `TxnDT > LastLoadDate`.
+Used a **Watermark Table** to store the last successful load date.  
+ADF **Lookup Activity** reads the watermark, **Copy Data Activity** loads only records where `TxnDT > LastLoadDate`, and **Script Activity** updates the watermark after successful execution.
 
-Daily output files are generated dynamically, and the watermark table is updated after successful execution to support future incremental loads.
-
-CDC-ADF-Project/
-│
-├── README.md
-├── sql/
-│   ├── source_table.sql
-│   ├── watermark_table.sql
-│   └── sample_data.sql
-└── adf_pipeline/
-    └── pipeline_screenshots/# CDC1
+This ensures only new records are processed and prevents duplicate data loading.
